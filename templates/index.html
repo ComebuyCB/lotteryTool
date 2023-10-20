@@ -9,56 +9,68 @@
     <link rel="icon" type="image/png" sizes="32x32" href="">
     <link rel="icon" type="image/png" sizes="96x96" href="">
 
-    <title></title>
+    <title>抽獎</title>
 
     <!-- core -->
-    <script src="/static/core/jquery-3.5.1/jquery-3.5.1.min.js"></script>
-    <link href="/static/core/bootstrap-5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <script src="/static/core/bootstrap-5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="/lotteryTool/static/core/jquery-3.5.1/jquery-3.5.1.min.js"></script>
+    <link href="/lotteryTool/static/core/bootstrap-5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="/lotteryTool/static/core/bootstrap-5.1.3/js/bootstrap.bundle.min.js"></script>
 
     <!-- plugins -->
-    <script src="/static/plugins/vue-3.2.45/vue.global.min.js"></script>
-    <link href="/static/plugins/fontawesome-free-5.15.1-web/css/all.min.css" rel="stylesheet">
+    <script src="/lotteryTool/static/plugins/vue-3.2.45/vue.global.min.js"></script>
+    <link href="/lotteryTool/static/plugins/fontawesome-free-5.15.1-web/css/all.min.css" rel="stylesheet">
 
     <!-- main -->
-    <link href="/static/common/css/main.css" rel="stylesheet">
-    <script src="/static/common/js/main.js"></script>
+    <link href="/lotteryTool/static/common/css/main.css" rel="stylesheet">
+    <script src="/lotteryTool/static/common/js/main.js"></script>
 </head>
 <body>
     <div id="wrap">
-        <main id="main" class="animate" :style="`background: ${data.background}`">
+        <main id="main" class="animate" :style="`background: ${data_settings.background}`">
             <div class="container py-3">
-                <div class="text-center" style="height: var(--img-height);">
-                    <img class="mb-3 h-100" :src="data.banner || ''" style="object-fit: contain;">
+                <div class="text-center mb-3" style="height: var(--img-height);">
+                    <img class="h-100" :src="data_settings.banner || ''" style="object-fit: contain;">
                 </div>
-                <div class="text-start ch-gx-2">
-                    <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-settings"><i class="fa fa-cog me-2"></i>設定</button>
-                    <button class="btn btn-danger" type="button" :disabled="!dataReady || isDraw" @click="startDraw()"><i class="fa fa-crown me-2"></i>抽獎</button>
+                <div class="d-flex align-items-end justify-content-between ch-gx-2">
+                    <div class="text-start" style="min-width: 100px;">
+                        <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-settings"><i class="fa fa-bars me-2"></i>獎項</button>
+                    </div>
+                    <div>
+                        <button class="btn btn-danger btn-lg" type="button" :disabled="!status.readyToDraw || status.isDrawing || status.hadDrawn" @click="startDraw()"><i class="fa fa-crown me-2"></i>{{status.isDrawing ? '抽獎中...' : '抽獎'}}</button>
+                    </div>
+                    <div class="text-end" style="min-width: 100px;">
+                        <button class="btn btn-success" @click="status.showListPanel = !status.showListPanel">顯示名單</button>
+                    </div>
                 </div>
 
                 <hr>
 
                 <div class="row g-3">
-                    <div class="col-lg-7 ch-gy-3">
-                        <div v-for="(item, idx) of data.prizes.data">
-                            <h4>{{item.name}} (抽出:{{item.amount}}個) (得獎:{{item.winners.length}}人)</h4>
+                    <div class="ch-gy-3" :class="status.showListPanel ? 'col-lg-7' : 'col-lg-12'">
+                        <div class="d-flex align-items-end"> 
+                            <button class="btn btn-secondary ms-auto" type="button" @click="status.extendCards = !status.extendCards"><i class="fa" :class="status.extendCards ? 'fa-list-ol': 'fa-th'"></i></button>
+                        </div>
+                        <div v-for="(item, idx) of data_settings.prizes.data" :id="'prize-' + idx">
+                            <h4>{{item.name}} (抽出:{{item.amount}}個) <span v-if="status.readyToDraw">(得獎:{{item.winners.length}}人)</span></h4>
                             <div class="card">
-                                <div class="card-body" style="max-height: 250px; overflow: auto;">
+                                <div class="card-body py-2">
                                     <div v-if="!item.winners[0]" class="text-danger">尚未開獎</div>
-                                    <div v-for="(winner, idx) of item.winners" class="slideUpAni" :style="`animation-delay: ${idx / item.winners.length}s;`"><b>{{winner}}</b></div>
+                                    <ol v-if="item.winners[0]" class="row gx-3 mb-0" :class="status.extendCards ? '' : 'small_winners_row row-cols-5'">
+                                        <li v-for="(winner, idx) of item.winners" class="slideUpAni" :style="`animation-delay: ${idx / item.winners.length}s;`"><b>{{winner}}</b></li>
+                                    </ol>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-5">
-                        <div class="ch-gy-3" style="position: sticky; top: 0;">
+                    <div v-if="status.showListPanel" class="col-lg-5">
+                        <div class="ch-gy-3" style="position: sticky; top: 8px;">
                             <div>
-                                <h4>未抽中名單：(共{{data.drawListDraw.lose.data.length}}名)</h4>
-                                <textarea class="form-control result_textarea" v-model="data.drawListDraw.lose.text" disabled></textarea>
+                                <h4 class="flex-center-a">已抽中名單：(共{{data_drawn.win.data.length}}名) <button class="btn btn-success btn-sm ms-2" @click="copy_text( data_drawn.win.outputText )">複製</button></h4>
+                                <textarea class="form-control result_textarea" disabled>{{ data_drawn.win.outputText }}</textarea>
                             </div>
                             <div>
-                                <h4 class="flex-center-a">輸出資料：<button class="btn btn-danger btn-sm" @click="remove_outputText()">清除</button></h4>
-                                <textarea class="form-control result_textarea" v-model="data.drawListDraw.outputText" disabled></textarea>
+                                <h4 class="flex-center-a">未抽中名單：(共{{data_drawn.lose.data.length}}名) <button class="btn btn-success btn-sm ms-2" @click="copy_text( data_drawn.lose.text )">複製</button></h4>
+                                <textarea class="form-control result_textarea" disabled>{{ data_drawn.lose.text }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -71,8 +83,8 @@
                 <h4 class="offcanvas-title flex-center-a">
                     <div>抽獎設定 </div>
                     <div class="ms-2 ch-gx-2">
-                        <button v-if="data_LS" class="btn btn-secondary btn-sm" :disabled="dataReady" @click="loadLS()"><i class="fa fa-file-code me-2"></i>讀取設定</button>
-                        <button v-if="dataReady" class="btn btn-dark btn-sm" @click="toEditMode()"><i class="fa fa-edit me-2"></i>重啟編輯</button>
+                        <button v-if="LS_settings" class="btn btn-secondary btn-sm" :disabled="status.readyToDraw" @click="LS_settings_load()"><i class="fa fa-file-code me-2"></i>讀取設定</button>
+                        <button class="btn btn-success btn-sm" :disabled="status.readyToDraw" @click="LS_settings_save()"><i class="fa fa-save me-2"></i>暫存設定</button>
                     </div>
                 </h4>
                 <button type="button" class="btn btn-close" data-bs-dismiss="offcanvas"></button>
@@ -82,15 +94,18 @@
                     <div class="">
                         <h5 class="flex-center-a">
                             <div><i class="far fa-image text-warning me-2"></i>抽獎圖片：</div>
-                            <div v-if="data.bannerSize > 2"><i class="fa fa-exclamation-triangle text-danger" title="檔案已超過2MB，可能會無法暫存數據。"></i></div>
+                            <div v-if="data_settings.bannerSize > 2"><i class="fa fa-exclamation-triangle text-danger" title="檔案已超過2MB，可能會無法暫存數據。"></i></div>
                         </h5>
-                        <input type="file" id="fileInput" class="form-control" @change="fileOnChange()" accept="image/*" :disabled="dataReady">
+                        <input type="file" id="fileInput" class="form-control" @change="fileOnChange()" accept="image/*" :disabled="status.readyToDraw">
                     </div>
                     <div class="">
                         <h5 class="flex-center-a">
-                            <div><i class="fa fa-paint-roller text-danger me-2"></i>背景色：</div>
+                            <div>
+                                <i class="fa fa-paint-roller text-danger me-2"></i>背景色：
+                                <button v-if="isSupportEyeDropper" class="btn btn-success btn-sm" @click="catchColor();" :disabled="status.readyToDraw">抓取顏色</button>
+                            </div>
                         </h5>
-                        <input type="color" class="form-control" style="height: 38px;" v-model="data.background" :disabled="dataReady">
+                        <input type="color" class="form-control" style="height: 38px;" v-model="data_settings.background" :disabled="status.readyToDraw">
                     </div>
 
                     <!-- <div class="">
@@ -102,49 +117,51 @@
                             <div><i class="fas fa-gift text-success me-2"></i>獎項設定：</div>
                             <div class="flex-center-a ch-gx-2">
                                 <div class="dropdown">
-                                    <button type="button" class="btn btn-primary btn-sm dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" :disabled="dataReady">快速產生</button>
+                                    <button type="button" class="btn btn-primary btn-sm dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" :disabled="status.readyToDraw">快速產生</button>
                                     <ul class="dropdown-menu">
-                                        <li><button class="dropdown-item" @click="genPrizes(3)" :disabled="dataReady">產3獎 (14抽)</button></li>
-                                        <li><button class="dropdown-item" @click="genPrizes(6)" :disabled="dataReady">產6獎 (91抽)</button></li>
-                                        <li><button class="dropdown-item" @click="genPrizes(10)" :disabled="dataReady">產10獎 (385抽)</button></li>
-                                        <li><button class="dropdown-item" @click="genPrizes(25)" :disabled="dataReady">產25獎 (5525抽)</button></li>
-                                        <li><button class="dropdown-item" @click="genPrizes(50)" :disabled="dataReady">產50獎 (42925抽)</button></li>
+                                        <li><button class="dropdown-item" @click="genPrizes(3)" :disabled="status.readyToDraw">產3獎 (14抽)</button></li>
+                                        <li><button class="dropdown-item" @click="genPrizes(6)" :disabled="status.readyToDraw">產6獎 (91抽)</button></li>
+                                        <li><button class="dropdown-item" @click="genPrizes(10)" :disabled="status.readyToDraw">產10獎 (385抽)</button></li>
+                                        <li><button class="dropdown-item" @click="genPrizes(25)" :disabled="status.readyToDraw">產25獎 (5525抽)</button></li>
+                                        <li><button class="dropdown-item" @click="genPrizes(50)" :disabled="status.readyToDraw">產50獎 (42925抽)</button></li>
                                     </ul>
                                 </div>
-                                <button class="btn btn-success btn-sm" @click="prizes_reverse()" :disabled="dataReady"><i class="fas fa-sort me-2"></i>反轉資料</button>
+                                <button class="btn btn-success btn-sm" @click="prizes_reverse()" :disabled="status.readyToDraw"><i class="fas fa-sort me-2"></i>反轉資料</button>
                             </div>
                         </h5>
-                        <textarea id="settings" class="form-control offcanvas_textarea" v-model="data.prizes.text" :disabled="dataReady" @input="data.prizes.data = updatePrizes_text2data()"></textarea>
-                        <div class="text-end">獎項{{data.prizes.data.length}}種，共{{prizes_amount}}抽</div>
+                        <textarea id="settings" class="form-control offcanvas_textarea" v-model="data_settings.prizes.text" :disabled="status.readyToDraw" @input="data_settings.prizes.data = transData().prizes_text2data()"></textarea>
+                        <div class="text-end">獎項{{data_settings.prizes.data.length}}種，共{{prizes_amount}}抽</div>
                     </div>
                     <div class="flex-grow-1 flex-shrink-0">
                         <h5 class="flex-center-a">
                             <div><i class="fas fa-users text-primary me-2"></i>待抽名單：</div>
                             <div class="flex-center-a ch-gx-2">
                                 <div class="dropdown">
-                                    <button type="button" class="btn btn-primary btn-sm dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" :disabled="dataReady">快速產生</button>
+                                    <button type="button" class="btn btn-primary btn-sm dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" :disabled="status.readyToDraw">快速產生</button>
                                     <ul class="dropdown-menu">
-                                        <li><button class="dropdown-item" @click="genDrawList(10)" :disabled="dataReady">產10名</button></li>
-                                        <li><button class="dropdown-item" @click="genDrawList(100)" :disabled="dataReady">產100名</button></li>
-                                        <li><button class="dropdown-item" @click="genDrawList(1000)" :disabled="dataReady">產1,000名</button></li>
-                                        <li><button class="dropdown-item" @click="genDrawList(10000)" :disabled="dataReady">產10,000名</button></li>
-                                        <li><div class="dropdown-item flex-center-a ch-gx-2 py-0">
-                                            <input class="form-control form-control-sm" maxlength="99" v-model.number="genDrawListValue">
-                                            <button class="btn btn-primary btn-sm flex-shrink-0" @click="genDrawList( genDrawListValue )">產生</button>
+                                        <li>
+                                            <div class="px-3 flex-center-a ch-gx-2 py-0">
+                                                <input class="form-control form-control-sm" maxlength="5" v-model.number="genDrawListValue" onkeyup="this.value=this.value.replace(/\D/g,'')">
+                                                <button class="btn btn-primary btn-sm flex-shrink-0" @click="genDrawList( genDrawListValue )">產生</button>
+                                            </div>
                                         </li>
+                                        <li><button class="dropdown-item" @click="genDrawList(10)" :disabled="status.readyToDraw">產10名</button></li>
+                                        <li><button class="dropdown-item" @click="genDrawList(100)" :disabled="status.readyToDraw">產100名</button></li>
+                                        <li><button class="dropdown-item" @click="genDrawList(1000)" :disabled="status.readyToDraw">產1,000名</button></li>
+                                        <li><button class="dropdown-item" @click="genDrawList(10000)" :disabled="status.readyToDraw">產10,000名</button></li>
                                     </ul>
                                 </div>
                             </div>
                         </h5>
-                        <textarea class="form-control offcanvas_textarea" v-model="data.drawList.text" :disabled="dataReady" @input="data.drawList.data = updateDrawList_text2data( data.drawList )"></textarea>
-                        <div class="text-end">共{{data.drawList.data.length}}名</div>
+                        <textarea class="form-control offcanvas_textarea" v-model="data_settings.drawList.text" :disabled="status.readyToDraw" @input="data_settings.drawList.data = transData().drawn_text2data( data_settings.drawList )"></textarea>
+                        <div class="text-end">共{{data_settings.drawList.data.length}}名</div>
                     </div>
                     <div class="flex-center-a justify-content-between">
                         <div>
-                            <button class="btn btn-success" :disabled="dataReady" @click="saveToLS()"><i class="fa fa-save me-2"></i>暫存設定</button>
+                            <button v-if="status.readyToDraw" class="btn btn-dark" @click="toEditMode()" :disabled="status.isDrawing"><i class="fa fa-edit me-2"></i>重啟編輯</button>
                         </div>
                         <div class="ch-gx-2">
-                            <button class="btn btn-danger" :disabled="dataReady" @click="readyToDraw()"><i class="fa fa-gifts me-2"></i>準備抽獎</button>
+                            <button v-if="!status.readyToDraw" class="btn btn-danger" :disabled="status.readyToDraw" @click="readyToDraw()"><i class="fa fa-gifts me-2"></i>準備抽獎</button>
                         </div>
                     </div>
                 </div>
@@ -153,148 +170,176 @@
     </div>
 
     <script>
-        const { ref, reactive, computed, watch } = Vue;
+        const { ref, reactive, computed, watch, onMounted } = Vue;
         const app = Vue.createApp({
             setup(){
-                const dataReady = ref(false);
-                const isDraw = ref(false);
-                const data_LS = ref( localStorage.getItem('lotteryData') );
-                const genDrawListValue = ref(0);
-                const data = reactive({
+                /*=== 狀態 ===*/
+                const status = reactive({
+                    readyToDraw: false, // 準備抽獎
+                    isDrawing: false, // 正在抽獎
+                    hadDrawn: false, // 已抽過獎
+                    showListPanel: false, // 顯示名單區塊
+                    extendCards: false,
+                });
+
+                /*=== 設定區 ===*/
+                const LS_settings = ref( localStorage.getItem('lottery_data_settings') );
+                const data_settings = reactive({
                     background: '#ffffff',
                     banner: '',
                     bannerSize: 0,
                     title: '',
                     prizes: { // 設定獎項
-                        data: [{name: '一等獎', amount: '10', winners: []},], // [ {name: '一等獎', amount: '10', winners: []}, ... ]
-                        text: '一等獎,10', // '一等獎,10\n...'
+                        data: [ // [ {name: '一等獎', amount: '10', winners: []}, ... ]
+                            {name: '頭獎', amount: '1', winners: []},
+                            {name: '二等獎', amount: '2', winners: []},
+                        ],
+                        text: '頭獎,1\n二等獎,2', // '一等獎,10\n...'
                     },
                     drawList: { // 設定好的原始資料
-                        data: ['Andy 台北市','Ben 20歲'],
-                        text: 'Andy 台北市\nBen 20歲',
-                    },
-                    drawListDraw: { // 抽獎後的 drawList，不會影響 drawList。
-                        win: { // 被抽中的名單
-                            data: [],
-                            text: '',
-                        },  // 沒抽中的名單
-                        lose: {
-                            data: [],
-                            text: '',
-                        },
-                        outputText: localStorage.getItem('lotteryResultData') || '',
+                        data: ['Andy 台北市','Ben 台北市中山區 30歲 '],
+                        text: 'Andy 台北市\nBen 台北市中山區 30歲',
                     },
                 })
-
-                function loadLS(){
-                    try {
-                        let obj_LS = JSON.parse( data_LS.value );
-                        for (let [key, val] of Object.entries( obj_LS ) ){
-                            data[key] = val;
-                        }
-                    } catch (err){
-                        let yes = confirm('讀取失效。是否清除暫存紀錄?');
-                        if ( yes ){
-                            localStorage.removeItem('lotteryData');
-                        }
-                    }
-                }
-                
+                const genDrawListValue = ref('');
+                const isSupportEyeDropper = ref( !!window.EyeDropper );
                 const prizes_amount = computed(()=>{
-                    return data.prizes.data.reduce((acc,val,idx)=> +acc + +val.amount, 0);
+                    return data_settings.prizes.data.reduce((acc,val,idx)=> +acc + +val.amount, 0);
                 })
 
-                watch( ()=>{ 
-                    return data.prizes.text
-                }, (newVal, oldVal)=>{
-                    
+                /*=== 抽獎結果區 ===*/
+                const LS_drawn = ref( localStorage.getItem('lottery_data_drawn') );
+                const data_drawn = reactive({ // 抽獎後的 drawList。
+                    lose: { // 沒抽中的名單
+                        data: [],
+                        text: '',
+                    },
+                    win: {
+                        data: [],
+                        outputText: '',
+                    },
                 })
 
                 function prizes_reverse(){
-                    data.prizes.text = data.prizes.text.split('\n').reverse().join('\n');
-                    data.prizes.data = updatePrizes_text2data();
-                }
-                function updatePrizes_data2text(){
-                    let txt = '';
-                    for ( let i=0; i<data.prizes.data.length; i++ ){
-                        let e = data.prizes.data[i];
-                        txt += `${e.name},${e.amount}`;
-                        if ( i != data.prizes.data.length - 1 ){
-                            txt += '\n';
-                        }
-                    }
-                    return txt;
-                }
-                function updatePrizes_text2data(){
-                    let arr = data.prizes.text.split('\n');
-                    let map = arr.map((e,idx)=>{
-                        let name = e.split(',')[0] || '';
-                        let amount = +e.split(',')[1] || 1;
-                        return { name, amount, winners: [] };
-                    })
-                    return map;
-                }
-                function updateDrawList_data2text( obj ){
-                    let txt = '';
-                    for ( let i=0; i<obj.data.length; i++ ){
-                        txt += obj.data[i];
-                        if ( i != obj.data.length - 1 ){
-                            txt += '\n';
-                        }
-                    }
-                    return txt;
-                }
-                function updateDrawList_text2data( obj ){
-                    let arr = obj.text.split('\n');
-                    return arr;
+                    data_settings.prizes.text = data_settings.prizes.text.split('\n').reverse().join('\n');
+                    data_settings.prizes.data = transData().prizes_text2data();
                 }
 
+                function transData(){
+                    return {
+                        prizes_data2text(){
+                            let txt = '';
+                            for ( let i=0; i<data_settings.prizes.data.length; i++ ){
+                                let e = data_settings.prizes.data[i];
+                                txt += `${e.name},${e.amount}`;
+                                if ( i != data_settings.prizes.data.length - 1 ){
+                                    txt += '\n';
+                                }
+                            }
+                            return txt;
+                        },
+                        prizes_text2data(){
+                            let arr = data_settings.prizes.text.split('\n');
+                            let map = arr.map((e,idx)=>{
+                                let name = e.split(',')[0] || '';
+                                let amount = +e.split(',')[1] || 1;
+                                return { name, amount, winners: [] };
+                            })
+                            return map;
+                        },
+                        drawn_data2text( obj ){
+                            let txt = '';
+                            for ( let i=0; i<obj.data.length; i++ ){
+                                txt += obj.data[i];
+                                if ( i != obj.data.length - 1 ){
+                                    txt += '\n';
+                                }
+                            }
+                            return txt;
+                        },
+                        drawn_text2data( obj ){
+                            let arr = obj.text.split('\n');
+                            return arr;
+                        },
+                    }
+                }
                 function genPrizes(len){
                     let arr = Array.from({length: len}, (e,i)=> { return {name: `${i+1}等獎`, amount: (i+1)*(i+1), winners: []} });
-                    data.prizes.data = arr;
-                    data.prizes.text = updatePrizes_data2text();
+                    data_settings.prizes.data = arr;
+                    data_settings.prizes.text = transData().prizes_data2text();
                 }
                 function genDrawList(len){
                     let arr = Array.from({length: len}, (e,i)=> '編號' + (i+1));
                     let txt = String(arr).split(',').join('\n');
-                    data.drawList.data = arr;
-                    data.drawList.text = txt;
+                    data_settings.drawList.data = arr;
+                    data_settings.drawList.text = txt;
                 }
                 function fileOnChange(){
                     const selectedFile = $('#fileInput')[0].files[0];
                     if (selectedFile) {
                         const reader = new FileReader();
-                        data.bannerSize = +(selectedFile.size / 1024 / 1024).toFixed(3);
+                        data_settings.bannerSize = +(selectedFile.size / 1024 / 1024).toFixed(3);
                         reader.onload = function(e) {
-                            data.banner = e.target.result;
+                            data_settings.banner = e.target.result;
                         };
                         reader.readAsDataURL(selectedFile);
                     } else {
-                        data.banner = '';
-                        data.bannerSize = 0;
+                        data_settings.banner = '';
+                        data_settings.bannerSize = 0;
                     }
                 }
-                function saveToLS(){
+                function LS_drawn_load(){
                     try {
-                        let LS_str = JSON.stringify( Vue.toRaw(data) );
-                        localStorage.setItem("lotteryData", LS_str);
-                        data_LS.value = LS_str;
-                        alert('已暫存!');
+                        let obj_LS = JSON.parse( LS_drawn.value );
+                        for (let [key, val] of Object.entries( obj_LS ) ){
+                            data_drawn[key] = val;
+                        }
+                        _alarm('名單讀取成功','alert-success right');
+                        status.readyToDraw = true;
+                        status.hadDrawn = true;
                     } catch (err){
-                        alert('暫存失敗，數據過大無法暫存。');
-                    }
-                    if ( localStorage.getItem("lotteryData") ){
+                        _alarm('名單讀取失敗','alert-danger right');
+                        localStorage.removeItem('lottery_data_drawn');
                     }
                 }
+                function LS_settings_load(){
+                    try {
+                        let obj_LS = JSON.parse( LS_settings.value );
+                        for (let [key, val] of Object.entries( obj_LS ) ){
+                            data_settings[key] = val;
+                        }
+                        _alarm('成功讀取設定','alert-success');
+                    } catch (err){
+                        let yes = confirm('讀取失效。是否清除暫存紀錄?');
+                        if ( yes ){
+                            localStorage.removeItem('lottery_data_settings');
+                        }
+                    }
+                }
+                function LS_settings_save(){
+                    try {
+                        let LS_str = JSON.stringify( Vue.toRaw(data_settings) );
+                        localStorage.setItem('lottery_data_settings', LS_str);
+                        LS_settings.value = LS_str;
+                        _alarm('已暫存','alert-success');
+                    } catch (err){
+                        alert('暫存失敗，數據過大無法暫存，或程式有誤。');
+                    }
+                }
+
+                function catchColor(){
+                    new EyeDropper().open().then((result)=>{ data_settings.background = result.sRGBHex })
+                }
+
                 function readyToDraw(){
-                    let prizeErr = data.prizes.data.some((e)=>e.name === '');
-                    let listErr = data.drawList.data.some((e)=> e === '');
+                    let prizeErr = data_settings.prizes.data.some((e)=>e.name === '');
+                    let listErr = data_settings.drawList.data.some((e)=> e === '');
                     if ( listErr || prizeErr ){
                         if ( prizeErr ){ alert('獎項設定有空白'); }
                         if ( listErr ){ alert('待抽名單有空白'); }
                     } else {
-                        dataReady.value = true;
-                        for ( let obj of data.prizes.data ){
+                        status.readyToDraw = true;
+                        for ( let obj of data_settings.prizes.data ){
                             obj.winners = [];
                         }
                         $('#offcanvas-settings').offcanvas('hide');
@@ -302,39 +347,48 @@
                 }
 
                 function toEditMode(){
-                    dataReady.value = false;
-                    isDraw.value = false;
+                    status.readyToDraw = false;
+                    status.isDrawing = false;
+                    status.hadDrawn = false;
                 }
-                
-                function remove_outputText(){
-                    localStorage.removeItem("lotteryResultData");
-                    data.drawListDraw.outputText = "";
+
+                // === view Panel ===
+                function copy_text( target ){
+                    navigator.clipboard.writeText( target );
+                    _alarm('已複製','alert-success right');
                 }
 
                 async function startDraw(){
-                    isDraw.value = true;
-                    data.drawListDraw.outputText = '';
-                    let drawList = Vue.toRaw(data.drawList);
-
+                    status.isDrawing = true;
+                    status.hadDrawn = true;
+                    data_drawn.win.outputText = '';
+                    data_drawn.lose.data = [];
+                    data_drawn.win.data = [];
+                    data_drawn.lose.text = '';
+                    let drawList = Vue.toRaw(data_settings.drawList);
                     let sortList = JSON.parse(JSON.stringify(drawList));
                         sortList.data.sort(() => Math.random() - 0.5);
-
                     let winListData = sortList.data.slice(0, prizes_amount.value); // 取陣列前 prizes_amount 抽數 (抽中的)。
 
                     let startIdx = 0;
-                    let outputTxt = '';
-                    for ( let obj of data.prizes.data ){
-                        await resolveAfter2Seconds(1000);
+                    for ( let idx in data_settings.prizes.data ){
+                        let obj = data_settings.prizes.data[idx];
+                        await resolveAfterMS(990);
+
                         let amount = +obj.amount;
                         let endIdx = startIdx + amount;
                         obj.winners = winListData.slice(startIdx, endIdx);
 
-                        outputTxt += `=== ${obj.name} (抽出:${obj.amount}個) (得獎:${obj.winners.length}人) ===\n`
-                        outputTxt += obj.winners.join('\n') + '\n';
-                        startIdx = endIdx;
-                    }
+                        let outputTxt = `=== ${obj.name} (抽出:${obj.amount}個) (得獎:${obj.winners.length}人) ===\n`
+                            outputTxt += `${obj.winners.join('\n')}\n`
+                        data_drawn.win.outputText += outputTxt;
 
-                    function resolveAfter2Seconds(s) {
+                        startIdx = endIdx;
+                        
+                        await resolveAfterMS(10);
+                        $('#prize-' + idx)[0].scrollIntoView({ block: "start" });
+                    }
+                    function resolveAfterMS(s) {
                         return new Promise((resolve) => {
                             setTimeout(() => {
                                 resolve();
@@ -346,33 +400,53 @@
                         return winListData.indexOf(e) === -1;
                     })
 
-                    // data.drawListDraw.win.data = winListData;
-                    // data.drawListDraw.win.text = updateDrawList_data2text( data.drawListDraw.win );
+                    await resolveAfterMS(1000);
 
-                    data.drawListDraw.lose.data = loseListData;
-                    data.drawListDraw.lose.text = updateDrawList_data2text( data.drawListDraw.lose );
+                    data_drawn.lose.data = loseListData;
+                    data_drawn.lose.text = transData().drawn_data2text( data_drawn.lose );
+                    data_drawn.win.data = winListData;
 
-                    data.drawListDraw.outputText = outputTxt;
-                    localStorage.setItem("lotteryResultData", outputTxt);
+                    try {
+                        localStorage.setItem('lottery_data_drawn', JSON.stringify( Vue.toRaw(data_drawn) ));
+                    } catch(e) {
+                        alert('無法暫存抽獎結果');
+                    }
+
+                    _alarm('抽獎結束', 'alert-danger');
+                    status.isDrawing = false;
                 }
 
+                function _alarm( text, alertClass ){
+                    let id = new Date().getTime();
+                    let tmp = `<div id="alarm-${id}" class="alarm alert ${alertClass}">${text}</div>`
+                    $('body').append(tmp);
+                    setTimeout(()=>{
+                        $('#alarm-'+id).remove();
+                    }, 5500)
+                }
+
+                onMounted(()=>{
+                    LS_drawn_load();
+                })
+
                 return {
-                    data,
-                    data_LS,
-                    dataReady,
-                    isDraw,
+                    status,
+                    data_settings,
+                    data_drawn,
+                    LS_settings,
                     prizes_amount,
                     genDrawListValue,
-                    updatePrizes_text2data,
-                    updateDrawList_text2data,
+                    isSupportEyeDropper,
+                    transData,
                     prizes_reverse,
                     genDrawList,
                     genPrizes,
-                    remove_outputText,
+                    catchColor,
+                    copy_text,
                     fileOnChange,
                     toEditMode,
-                    loadLS,
-                    saveToLS,
+                    LS_settings_load,
+                    LS_settings_save,
                     readyToDraw,
                     startDraw,
                 }
