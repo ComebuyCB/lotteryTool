@@ -48,7 +48,7 @@
                 <div class="row g-3">
                     <div class="ch-gy-3" :class="status.showListPanel ? 'col-lg-7' : 'col-lg-12'">
                         <div class="d-flex align-items-end"> 
-                            <button class="btn btn-secondary ms-auto" type="button" @click="status.extendCards = !status.extendCards"><i class="fa" :class="status.extendCards ? 'fa-list-ol': 'fa-th'"></i></button>
+                            <button class="btn btn-dark ms-auto" type="button" @click="status.extendCards = !status.extendCards"><i class="fa" :class="status.extendCards ? 'fa-list-ol': 'fa-th'"></i></button>
                         </div>
                         <div v-for="(item, idx) of data_settings.prizes.data" :id="'prize-' + idx">
                             <h4>{{item.name}} (抽出:{{item.amount}}個) <span v-if="status.readyToDraw">(得獎:{{item.winners.length}}人)</span></h4>
@@ -64,6 +64,10 @@
                     </div>
                     <div v-if="status.showListPanel" class="col-lg-5">
                         <div class="ch-gy-3" style="position: sticky; top: 8px;">
+                            <div class="ch-gx-2 text-end">
+                                <button v-if="LS_drawn" class="btn btn-secondary" :disabled="status.isDrawing" @click="LS_drawn_load()"><i class="fa fa-file-alt me-2"></i>還原暫存名單</button>
+                                <button class="btn btn-danger" :disabled="status.isDrawing" @click="clear_data_drawn()"><i class="fa fa-times me-2"></i>全部清除</button>
+                            </div>
                             <div>
                                 <h4 class="flex-center-a">已抽中名單：(共{{data_drawn.win.data.length}}名) <button class="btn btn-success btn-sm ms-2" @click="copy_text( data_drawn.win.outputText )">複製</button></h4>
                                 <textarea class="form-control result_textarea" disabled>{{ data_drawn.win.outputText }}</textarea>
@@ -178,7 +182,7 @@
                     readyToDraw: false, // 準備抽獎
                     isDrawing: false, // 正在抽獎
                     hadDrawn: false, // 已抽過獎
-                    showListPanel: false, // 顯示名單區塊
+                    showListPanel: true, // 顯示名單區塊
                     extendCards: false,
                 });
 
@@ -288,6 +292,7 @@
                         data_settings.bannerSize = 0;
                     }
                 }
+                
                 function LS_drawn_load(){
                     try {
                         let obj_LS = JSON.parse( LS_drawn.value );
@@ -295,11 +300,21 @@
                             data_drawn[key] = val;
                         }
                         _alarm('名單讀取成功','alert-success right');
-                        status.readyToDraw = true;
-                        status.hadDrawn = true;
+                        // status.readyToDraw = true;
+                        // status.hadDrawn = true;
                     } catch (err){
                         _alarm('名單讀取失敗','alert-danger right');
                         localStorage.removeItem('lottery_data_drawn');
+                    }
+                }
+                function LS_drawn_save(){
+                    try {
+                        let LS_str = JSON.stringify( Vue.toRaw(data_drawn) );
+                        localStorage.setItem('lottery_data_drawn', LS_str);
+                        LS_drawn.value = LS_str;
+                        _alarm('已更新暫存名單', 'alert-success right');
+                    } catch(err) {
+                        _alarm('無法暫存名單，請複製好資料自行儲存', 'alert-danger right');
                     }
                 }
                 function LS_settings_load(){
@@ -332,6 +347,7 @@
                 }
 
                 function readyToDraw(){
+                    clear_data_drawn();
                     let prizeErr = data_settings.prizes.data.some((e)=>e.name === '');
                     let listErr = data_settings.drawList.data.some((e)=> e === '');
                     if ( listErr || prizeErr ){
@@ -358,13 +374,17 @@
                     _alarm('已複製','alert-success right');
                 }
 
+                function clear_data_drawn(){
+                    data_drawn.win.outputText = '';
+                    data_drawn.win.data = [];
+                    data_drawn.lose.data = [];
+                    data_drawn.lose.text = '';
+                }
+
                 async function startDraw(){
                     status.isDrawing = true;
                     status.hadDrawn = true;
-                    data_drawn.win.outputText = '';
-                    data_drawn.lose.data = [];
-                    data_drawn.win.data = [];
-                    data_drawn.lose.text = '';
+                    clear_data_drawn();
                     let drawList = Vue.toRaw(data_settings.drawList);
                     let sortList = JSON.parse(JSON.stringify(drawList));
                         sortList.data.sort(() => Math.random() - 0.5);
@@ -374,17 +394,13 @@
                     for ( let idx in data_settings.prizes.data ){
                         let obj = data_settings.prizes.data[idx];
                         await resolveAfterMS(990);
-
                         let amount = +obj.amount;
                         let endIdx = startIdx + amount;
                         obj.winners = winListData.slice(startIdx, endIdx);
-
                         let outputTxt = `=== ${obj.name} (抽出:${obj.amount}個) (得獎:${obj.winners.length}人) ===\n`
                             outputTxt += `${obj.winners.join('\n')}\n`
                         data_drawn.win.outputText += outputTxt;
-
                         startIdx = endIdx;
-                        
                         await resolveAfterMS(10);
                         $('#prize-' + idx)[0].scrollIntoView({ block: "start" });
                     }
@@ -395,23 +411,14 @@
                             }, s || 10);
                         });
                     }
-
                     let loseListData = drawList.data.filter((e)=>{
                         return winListData.indexOf(e) === -1;
                     })
-
                     await resolveAfterMS(1000);
-
                     data_drawn.lose.data = loseListData;
                     data_drawn.lose.text = transData().drawn_data2text( data_drawn.lose );
                     data_drawn.win.data = winListData;
-
-                    try {
-                        localStorage.setItem('lottery_data_drawn', JSON.stringify( Vue.toRaw(data_drawn) ));
-                    } catch(e) {
-                        alert('無法暫存抽獎結果');
-                    }
-
+                    LS_drawn_save();
                     _alarm('抽獎結束', 'alert-danger');
                     status.isDrawing = false;
                 }
@@ -425,15 +432,12 @@
                     }, 5500)
                 }
 
-                onMounted(()=>{
-                    LS_drawn_load();
-                })
-
                 return {
                     status,
                     data_settings,
                     data_drawn,
                     LS_settings,
+                    LS_drawn,
                     prizes_amount,
                     genDrawListValue,
                     isSupportEyeDropper,
@@ -442,11 +446,13 @@
                     genDrawList,
                     genPrizes,
                     catchColor,
+                    clear_data_drawn,
                     copy_text,
                     fileOnChange,
                     toEditMode,
                     LS_settings_load,
                     LS_settings_save,
+                    LS_drawn_load,
                     readyToDraw,
                     startDraw,
                 }
